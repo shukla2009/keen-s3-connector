@@ -25,10 +25,10 @@ const keen = new Keen({
 });
 
 function upload(date, collection) {
-    let start = moment(date).startOf('day');
-    //let end = moment(start).add(1, 'minutes');
-    let end = moment(start).endOf('day');
-    let fileName = moment(start).format('YYYY_MM_DD');
+    let start = date;
+    let end = moment(start).add(1, 'hours').subtract(1,'milliseconds');
+    //let end = moment(start).endOf('day');
+    let fileName = moment(start).format('YYYY_MM_DD_HH');
     let s3Bucket = config.aws.s3.bucket;
     let folder = collection.toLowerCase().replace('-', '_');
     async.waterfall([
@@ -43,7 +43,6 @@ function upload(date, collection) {
                 cb(null, res.result);
             }).catch(err => {
                 logger.error(`FAILED : Keen download of ${collection} for date ${start} with error ${err}`);
-
                 cb(err);
             });
 
@@ -72,7 +71,7 @@ function upload(date, collection) {
         // check point in cassandra
         function (result, cb) {
             let query = 'INSERT INTO keen (collection, date, count) VALUES (?, ?, ?)';
-            const params = [collection, moment(start).format('YYYY-MM-DD HH:MM:SS'), result];
+            const params = [collection, moment(start).format('YYYY-MM-DD HH:mm:ss'), result];
             cassClient.execute(query, params, {prepare: true}, function (err) {
                 if (err) {
                     logger.error(`FAILED : Cassandra checkpoint of ${collection} for date ${start} with error ${err}`);
@@ -90,10 +89,10 @@ function upload(date, collection) {
         }
         else {
             logger.info(`SUCCESS : ${result} records saved of ${collection} for date ${start} to S3`);
-            start = moment(start).subtract(1, 'days');
+            start = moment(start).subtract(1, 'hours');
             if (moment(config.duration.end) < start) {
                 logger.info(`Start sync of  ${collection} for date ${start}`);
-                upload(moment(start).format('YYYY-MM-DD'), collection);
+                upload(moment(start).format('YYYY-MM-DD HH:mm:ss'), collection);
             }
             else {
                 logger.info(`Job Finished  ${collection} for date ${config.duration.start} - ${config.duration.end}`);
@@ -110,16 +109,17 @@ function start() {
         if (err) {
             logger.error(`Failed Cassandra error ${err}`);
         } else {
-            if (!!result && !!result.rows && result.rows.length >0) {
+            if (!!result && !!result.rows && result.rows.length > 0) {
                 let lastSavedDate = moment(result.rows[0].date);
                 if (lastSavedDate > moment(config.duration.end)) {
-                    upload(moment(lastSavedDate).format('YYYY-MM-DD'), config.stream);
+                    upload(moment(lastSavedDate).format('YYYY-MM-DD HH:mm:ss'), config.stream);
                 }
             }
             else {
-                upload(config.duration.start, config.stream);
+                upload(moment(config.duration.start).endOf('day').startOf('hour'), config.stream);
             }
         }
     });
 }
+
 start();
