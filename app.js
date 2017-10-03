@@ -14,8 +14,7 @@ const cassClient = new cassandra.Client({contactPoints: cp, keyspace: config.cas
 
 AWS.config.update({
     accessKeyId: config.aws.access.id,
-    secretAccessKey: config.aws.access.key,
-    sslEnabled: true
+    secretAccessKey: config.aws.access.key
 });
 
 const s3 = new AWS.S3();
@@ -72,7 +71,7 @@ function upload(date, collection) {
         },
         // check point in cassandra
         function (result, cb) {
-            let query = 'INSERT INTO keen_backup (collection, date, count) VALUES (?, ?, ?)';
+            let query = 'INSERT INTO keen (collection, date, count) VALUES (?, ?, ?)';
             const params = [collection, moment(start).format('YYYY-MM-DD HH:MM:SS'), result];
             cassClient.execute(query, params, {prepare: true}, function (err) {
                 if (err) {
@@ -87,6 +86,7 @@ function upload(date, collection) {
     ], function (err, result) {
         if (err) {
             logger.error(`FAILED : Sync of ${collection} for date ${start} with error ${err}`);
+            process.exit();
         }
         else {
             logger.info(`SUCCESS : ${result} records saved of ${collection} for date ${start} to S3`);
@@ -104,13 +104,13 @@ function upload(date, collection) {
 }
 
 function start() {
-    let query = `SELECT date from keen_backup WHERE collection = ? LIMIT 1`;
+    let query = `SELECT date from keen WHERE collection = ? LIMIT 1`;
     let params = [config.stream];
     cassClient.execute(query, params, {prepare: true}, function (err, result) {
         if (err) {
             logger.error(`Failed Cassandra error ${err}`);
         } else {
-            if (!!result && !!result.rows) {
+            if (!!result && !!result.rows && result.rows.length >0) {
                 let lastSavedDate = moment(result.rows[0].date);
                 if (lastSavedDate > moment(config.duration.end)) {
                     upload(moment(lastSavedDate).format('YYYY-MM-DD'), config.stream);
