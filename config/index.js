@@ -9,6 +9,7 @@ var all = {
     duration: {
         start: process.env.DURATION_START,
         end: process.env.DURATION_END,
+        interval: process.env.DURATION_INTERVAL || 60
     },
     stream: process.env.KEEN_STREAM
 };

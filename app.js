@@ -26,9 +26,9 @@ const keen = new Keen({
 
 function upload(date, collection) {
     let start = date;
-    let end = moment(start).add(1, 'hours').subtract(1,'milliseconds');
+    let end = moment(start).add(config.duration.interval, 'minutes').subtract(1, 'milliseconds');
     //let end = moment(start).endOf('day');
-    let fileName = moment(start).format('YYYY_MM_DD_HH');
+    let fileName = moment(start).format('YYYY_MM_DD_HH_mm');
     let s3Bucket = config.aws.s3.bucket;
     let folder = collection.toLowerCase().replace('-', '_');
     async.waterfall([
@@ -89,7 +89,7 @@ function upload(date, collection) {
         }
         else {
             logger.info(`SUCCESS : ${result} records saved of ${collection} for date ${start} to S3`);
-            start = moment(start).subtract(1, 'hours');
+            start = moment(start).subtract(config.duration.interval, 'minutes');
             if (moment(config.duration.end) < start) {
                 logger.info(`Start sync of  ${collection} for date ${start}`);
                 upload(moment(start).format('YYYY-MM-DD HH:mm:ss'), collection);
@@ -112,7 +112,7 @@ function start() {
             if (!!result && !!result.rows && result.rows.length > 0) {
                 let lastSavedDate = moment(result.rows[0].date);
                 if (lastSavedDate > moment(config.duration.end)) {
-                    upload(moment(lastSavedDate).format('YYYY-MM-DD HH:mm:ss'), config.stream);
+                    upload(moment(lastSavedDate.subtract(config.duration.interval,'minutes')).format('YYYY-MM-DD HH:mm:ss'), config.stream);
                 }
             }
             else {
